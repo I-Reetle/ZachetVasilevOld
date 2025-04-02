@@ -1,7 +1,6 @@
 package ru.yarsu
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.github.doyaaaaaken.kotlincsv.dsl.csvWriter
 import org.http4k.core.*
 import org.http4k.lens.contentType
 import org.http4k.routing.bind
@@ -9,60 +8,84 @@ import org.http4k.routing.routes
 import org.http4k.server.Netty
 import org.http4k.server.asServer
 import ru.yarsu.domain.MovementType
-import ru.yarsu.domain.Product
-import ru.yarsu.domain.ProductMovement
 import ru.yarsu.domain.ProductMovementStore
 import ru.yarsu.domain.ProductStore
-import java.time.LocalDateTime
-import java.util.ResourceBundle
-import java.util.UUID
-import kotlin.random.Random
 
 fun main() {
     val productMovementStore = ProductMovementStore.fromCsv()
     val productStore = ProductStore.fromCsv()
 
-    val productList: MutableList<Product1> = mutableListOf()
+    val list: MutableList<ProductJson> = mutableListOf()
+    productStore.list().forEach{ list.add(ProductJson(it.name, 0.0)) }
 
-    val productStoreList = productStore.list()
-    productStoreList.forEach { productList.add(Product1(it.name, 0.0))}
 
-    for (it in productMovementStore.list()){
-        var name: String? = null
-        for (t in productStore.list()){
-            if (it.id == t.id)
-                name = t.name
+    val productMovementStoreList = productMovementStore.list()
+
+    //Проходимся по всем действиям в ProductMovementStore и прибавляем/уменьшаем значения ConsumedAmount для каждого объекта в списке list
+    productMovementStoreList.forEach{
+        val productId = it.productId
+        var productName: String = ""
+        for (i in productStore.list()){
+            if (productId == i.id){
+                productName = i.name
+            }
         }
+
+        //Add
         if (it.type == MovementType.ADDITION){
-            for( i in productList){
-                if (i.ProductName == name){
+            for (i in list){
+                if (productName == i.ProductName){
                     i.ConsumedAmount += it.amount
                 }
             }
         }
-    }
-
-    val getHandler: HttpHandler = { request: Request ->
-        val parameter = request.query("product-count")
-        val filterList: MutableList<Product1> = mutableListOf()
-        if (parameter != null) {
-            if (parameter.toInt() > 0) {
-                for (i in 0 until parameter!!.toInt()) {
-                    filterList.add(productList[i])
-                    val jsonString = ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(filterList)
-                    Response(Status.OK).body(jsonString)
+        //Remove
+        else{
+            for (i in list){
+                if (productName == i.ProductName){
+                    i.ConsumedAmount -= it.amount
                 }
             }
-            else {
-                Response(Status.BAD_REQUEST).body("{\n" +
-                        "    \"Error\": \"Значение параметра product-count содержит отрицательное число.\"\n" +
-                        "}").contentType(ContentType.APPLICATION_JSON)
+        }
+    }
+
+    list.sortByDescending { it.ConsumedAmount }
+
+    val getHandler: HttpHandler = {request: Request ->
+
+        val count1 = request.query("top")
+        if (count1 != null){
+            val count2 = count1.toIntOrNull()
+            if (count2 != null){
+                if (count2 < 0){
+                    val jsonString = ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(ErrorMessage("Параметр не должен быть отрицательным"))
+                    Response(Status.BAD_REQUEST).body(jsonString)
+                }
+                else{
+                    val filteredList: MutableList<ProductJson> = mutableListOf()
+                    for (i in 0 until count2) {
+                        filteredList.add(list[i])
+                    }
+                    val jsonString = ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(filteredList)
+                    Response(Status.OK).body(jsonString).contentType(ContentType.APPLICATION_JSON)
+                }
+            }
+            else{
+                val jsonString = ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(ErrorMessage("Параметр должен быть положительным числом"))
+                Response(Status.BAD_REQUEST).body(jsonString)
             }
         }
-        val jsonString = ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(productList)
-        Response(Status.OK).body(jsonString).contentType(ContentType.APPLICATION_JSON)
-
+        else{
+            val filteredList: MutableList<ProductJson> = mutableListOf()
+            for (i in 0..4) {
+                filteredList.add(list[i])
+            }
+            val jsonString = ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(filteredList)
+            Response(Status.OK).body(jsonString).contentType(ContentType.APPLICATION_JSON)
+        }
     }
+
+
 
     val app = routes(
         "/top-products" bind Method.GET to getHandler
@@ -70,14 +93,10 @@ fun main() {
 
     val server = app.asServer(Netty(9000)).start()
 
-    val pingRouteHandler: HttpHandler = { Response(Status.OK).body("pong") }
-//    val server = pingRouteHandler.asServer(Netty(9000))
-//    server.start()
-    //println("Application is available on http://localhost:${server.port()}")
 
 
 }
 
-data class Product1(val ProductName: String, var ConsumedAmount: Double)
-data class Error(val Error: String)
+data class ProductJson(val ProductName: String, var ConsumedAmount: Double)
+data class ErrorMessage(val Error: String)
 
