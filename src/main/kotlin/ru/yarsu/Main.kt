@@ -28,6 +28,7 @@ fun main() {
         for (i in productStore.list()){
             if (productId == i.id){
                 productName = i.name
+                break
             }
         }
 
@@ -36,6 +37,7 @@ fun main() {
             for (i in list){
                 if (productName == i.ProductName){
                     i.ConsumedAmount += it.amount
+                    break
                 }
             }
         }
@@ -44,6 +46,7 @@ fun main() {
             for (i in list){
                 if (productName == i.ProductName){
                     i.ConsumedAmount -= it.amount
+                    break
                 }
             }
         }
