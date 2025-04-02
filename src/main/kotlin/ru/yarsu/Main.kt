@@ -62,7 +62,7 @@ fun main() {
             if (count2 != null){
                 if (count2 < 0){
                     val jsonString = ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(ErrorMessage("Параметр не должен быть отрицательным"))
-                    Response(Status.BAD_REQUEST).body(jsonString)
+                    Response(Status.BAD_REQUEST).body(jsonString).contentType(ContentType.APPLICATION_JSON)
                 }
                 else{
                     val filteredList: MutableList<ProductJson> = mutableListOf()
@@ -75,7 +75,7 @@ fun main() {
             }
             else{
                 val jsonString = ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(ErrorMessage("Параметр должен быть положительным числом"))
-                Response(Status.BAD_REQUEST).body(jsonString)
+                Response(Status.BAD_REQUEST).body(jsonString).contentType(ContentType.APPLICATION_JSON)
             }
         }
         else{
@@ -88,15 +88,11 @@ fun main() {
         }
     }
 
-
-
     val app = routes(
         "/top-products" bind Method.GET to getHandler
     )
 
     val server = app.asServer(Netty(9000)).start()
-
-
 
 }
 
