@@ -1,6 +1,7 @@
 package ru.yarsu
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import org.http4k.core.*
 import org.http4k.lens.contentType
 import org.http4k.routing.bind
@@ -88,13 +89,51 @@ fun main() {
         }
     }
 
+    val postHandler: HttpHandler = { request: Request ->
+        val data = request.bodyString()
+        println(data)
+        try {
+            val postJsonData1 = ObjectMapper().readValue<postJsonData>(data)
+            val name = postJsonData1.name
+            val type = postJsonData1.type
+            val amount = postJsonData1.amount
+            if (type == 0) {
+                var flag = 0
+                for (i in list) {
+                    if (i.ProductName == name) {
+                        i.ConsumedAmount += amount
+                        flag = 1
+                    }
+                }
+                if (flag == 0){
+                    list.add(ProductJson(name, amount))
+                }
+            }
+            if (type == 1) {
+                for (i in list) {
+                    if (i.ProductName == name) {
+                        i.ConsumedAmount -= amount
+                    }
+                }
+            }
+            Response(Status.OK)
+        }
+        catch (e: Exception) {
+            Response(Status.BAD_REQUEST)
+        }
+    }
+
     val app = routes(
-        "/top-products" bind Method.GET to getHandler
+        "/top-products" bind Method.GET to getHandler,
+        "/add-product" bind Method.POST to postHandler
     )
 
     val server = app.asServer(Netty(9000)).start()
 
+
 }
+
+data class postJsonData(val name: String, val amount: Double, val type: Int)
 
 data class ProductJson(val ProductName: String, var ConsumedAmount: Double)
 data class ErrorMessage(val Error: String)
